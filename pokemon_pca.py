@@ -103,7 +103,12 @@ if __name__ == "__main__":
 
     # quick check when running the module directly
     data, pokemon_species_count = list(data_parser.iter_test_data())
-    components = 4 if len(feature_names) > 7 else len(feature_names) - 1
+    components = 7 if len(feature_names) > 7 else len(feature_names) - 1
+
+    sum = 0
+    for name, count in pokemon_species_count.items():
+        sum += count
+    log(f"Total Pokemon Species Count: {sum}", color='magenta')
 
     log("\n\n---- Data Summary ----\n", color='magenta')
     log(f"Loaded {len(data)} records from data/train.jsonl", color='magenta')
@@ -134,15 +139,26 @@ if __name__ == "__main__":
         transformed = pca.fit_transform(features_encoded)
 
         for i in range(components):
-            # Retrieve the names of the best features
-            best_features = [feature_names[h] for h in pca.components_[i].argsort()[-components:][::-1]]
-            log(f"Best features and contribution to principal component {i + 1}:", color='blue')
-            for j in range(len(best_features)):
-                percentage = pca.explained_variance_ratio_[j] * 100
-                feature_color = "green" if percentage >= 2 else "red"
+            # Retrieve the names of the features and their contributions to the principal component
+            feature_contributions = zip(feature_names, pca.components_[i])
+            sorted_features = sorted(feature_contributions, key=lambda x: abs(x[1]), reverse=True)
 
-                log(f"{best_features[j]:<15}\t-", color='blue', tabs=1, end="\t")
-                log(f"{percentage:.2f}%", color=feature_color)
+            log(f"PCA Component {i + 1}: Explained Variance = {pca.explained_variance_ratio_[i] * 100:.2f}%", color='blue')
+            log(f"Feature relevance for principal component {i + 1}:", color='blue')
+
+            max_features = 4
+            for feature, contribution in sorted_features:
+                if max_features <= 0:
+                    break
+                max_features -= 1
+
+                contribution_percentage = abs(contribution) * 100
+                feature_color = "green" if contribution_percentage >= 10 else "red"
+
+                log(f"{feature:<15}\t-", color='blue', tabs=1, end="\t")
+                log(f"{contribution_percentage:.2f}%", color=feature_color)
+        
+            log("\n")
     else:
         log("No valid features found for PCA.", color='red')
 

@@ -1,137 +1,59 @@
-from pathlib import Path
-import json
-from typing import List, Dict, Any, Iterator, Union
+import utilities.data_parser as data_parser
+from utilities.logger import log
+from typing import List, Dict, Any
 from sklearn.decomposition import PCA
-from sklearn.model_selection import KFold
 import numpy as np
 from collections import defaultdict
-import pandas as pd
 
+DEBUG = True
 pokemon_species = []
 pokemon_species_count = defaultdict(int)  # Counter for Pokémon species occurrences
-feature_names = ["name", "atk", "def", "hp", "spa", "spd", "spe"]
+feature_names = ["atk", "hp", "def", "types", "spa", "spd", "spe"]
+types_list = ["grass", "psychic", "fire", "water", "electric", "ice", "fighting",
+                "poison", "ground", "flying", "bug", "rock", "ghost", "dragon", "dark",
+                "steel", "fairy", "normal"]
+partial_types_list = ["grass", "psychic", "fire", "water", "electric", "ice",
+                "poison", "ground", "flying", "rock", "ghost", "dragon",
+                "normal"]
 
-def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0) -> Iterator[Dict[str, Any]]:
-    """
-    Yield JSON objects from a JSONL file one by one (memory efficient).
-    """
-    if path is None:
-        path = Path(__file__).resolve().parent / "data" / "train.jsonl"
-    path = Path(path)
+def pokemon_info():
+    local_pokemon_set = set()
 
-    if not path.exists():
-        raise FileNotFoundError(f"JSONL file not found: {path}")
+    local_features = sorted(feature_names, key=lambda x: (x.startswith("type_"), x))
 
-    with path.open("r", encoding="utf-8") as fh:
-        for lineno, line in enumerate(fh, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                yield json.loads(line)
-                if lineno <= entry_to_print:
-                    entry = json.loads(line)
-                    entry_str = json.dumps(entry, indent=2)
-                    if len(entry_str) > 500:  # Truncate if exceeds 500 characters
-                        entry_str = entry_str[:500] + "...\n[Truncated]"
-                    print(f"Entry {lineno}:\n{entry_str}")
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON on line {lineno} in {path}: {e.msg}") from e
-            
-def name_to_int(name: str) -> int:
-    if name in pokemon_species:
-        pokemon_species_count[name] += 1  # Increment the counter for this Pokémon
-        return pokemon_species.index(name)
-    else:
-        pokemon_species.append(name)
-        pokemon_species_count[name] += 1  # Initialize the counter for this Pokémon
-        return len(pokemon_species) - 1
+    log("NAME\t\t\t", color='yellow', end=" ")
+    for key in local_features:
+        if key.startswith("type_"):
+            continue
+        else:
+            log(f"{key.upper():<3}\t", color='yellow', end=" ")
+    log("\n")
 
-# K-Fold Target Encoding for Pokemon Names
-def kfold_target_encode_pokemon(data: List[Dict[str, Any]], n_splits: int = 5, random_state: int = 42) -> Dict[str, float]:
-    """
-    Perform k-fold target encoding for Pokemon names based on win rate.
-    
-    Args:
-        data: List of battle records from JSONL
-        n_splits: Number of folds for cross-validation
-        random_state: Random seed for reproducibility
-    
-    Returns:
-        Dictionary mapping Pokemon name to encoded value (mean win rate)
-    """
-    # Prepare data: extract all Pokemon from p1_team and their corresponding target
-    pokemon_records = []
-    
     for record in data:
-        target = 1 if record.get("player_won", False) else 0
-        for pokemon in record.get("p1_team_details", []):
-            pokemon_name = pokemon.get("name", "")
-            if pokemon_name:
-                pokemon_records.append({
-                    'name': pokemon_name,
-                    'target': target
-                })
-    
-    if not pokemon_records:
-        print("Warning: No Pokemon records found for target encoding!")
-        return {}
-    
-    # Convert to DataFrame for easier manipulation
-    df = pd.DataFrame(pokemon_records)
-    
-    # Initialize encoding dictionary with global mean as fallback
-    global_mean = df['target'].mean()
-    encoding_dict = defaultdict(lambda: global_mean)
-    
-    # Create indices array
-    indices = np.arange(len(df))
-    
-    # Perform k-fold target encoding
-    print(f"Performing K-Fold Target Encoding with {n_splits} splits...")
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    
-    # All encodings collected from each fold
-    fold_encodings = defaultdict(list)
-    
-    print("Percentage of folds completed:")
-    for i, (train_idx, val_idx) in enumerate(kf.split(indices)):
-        # Split data
-        train_df = df.iloc[train_idx]
-        val_df = df.iloc[val_idx]
-        
-        # Calculate mean target for each Pokemon in training set
-        train_means = train_df.groupby('name')['target'].mean().to_dict()
-        
-        # Apply encoding to validation set
-        for pokemon_name in val_df['name'].unique():
-            if pokemon_name in train_means:
-                fold_encodings[pokemon_name].append(train_means[pokemon_name])
-            else:
-                # Use global mean if Pokemon not seen in training fold
-                fold_encodings[pokemon_name].append(global_mean)
-        
-        print(f"{(i + 1) / n_splits * 100:.1f}%", end="\r", flush=True)
-    print("\nK-Fold Target Encoding completed.")
-    
-    # Average the encodings across all folds
-    for pokemon_name, encodings in fold_encodings.items():
-        encoding_dict[pokemon_name] = np.mean(encodings)
-    
-    # For Pokemon that weren't in validation sets, use overall mean from full dataset
-    all_pokemon = df['name'].unique()
-    for pokemon_name in all_pokemon:
-        if pokemon_name not in encoding_dict:
-            encoding_dict[pokemon_name] = df[df['name'] == pokemon_name]['target'].mean()
-    
-    return dict(encoding_dict)
+        for pokemon in record["p1_team_details"]:
+            if pokemon["name"] in local_pokemon_set:
+                continue
+            local_pokemon_set.add(pokemon["name"])
+
+            log(f"{pokemon['name']:12} ({pokemon_species_count.get(pokemon['name'], 0)})\t", color='cyan', end=" ")
+            for key in local_features:
+                if key == "name":
+                    continue
+                if key.startswith("type_"):
+                    type_ = key.split("_", 1)[1]
+                    if type_ in pokemon["types"]:
+                        log(f"{type_:3}", color='cyan', end=" ")
+                    else:
+                        log(f"{type_:3}", color='gray', end=" ")
+                else:
+                    log(f"{pokemon[f'base_{key}']:<3}\t", color='cyan', end=" ")
+            log()
 
 
 # Extract numerical data with optional target encoding
 def extract_features_with_encoding(
     data: List[Dict[str, Any]], 
     max_elements: int = float("inf"),
-    use_target_encoding: bool = False,
     target_encoding_dict: Dict[str, float] = None
 ) -> np.ndarray:
     """
@@ -146,6 +68,7 @@ def extract_features_with_encoding(
     Returns:
         NumPy array of features
     """
+
     features = {}
     for feat in feature_names:
         features[feat] = []
@@ -158,89 +81,69 @@ def extract_features_with_encoding(
 
         for pokemon in record["p1_team_details"]:
             for key in feature_names:
-                format_key = f"base_{key}" if key != "name" else "name"
-                if format_key not in pokemon:
-                    raise KeyError(f"Missing key '{key}' in Pokémon data: {pokemon}")
+                format_key = f"base_{key}"
 
-                if key == "name":
-                    if use_target_encoding and target_encoding_dict:
-                        # Use target encoding
-                        pokemon_name = pokemon[format_key]
-                        encoded_value = target_encoding_dict.get(pokemon_name, 0.5)  # 0.5 as fallback
-                        features["name"].append(encoded_value)
+                if key.startswith("type_"):
+                    type_ = key.split("_", 1)[1]
+                    if type_ in pokemon["types"]:
+                        features[f"type_{type_}"].append(1)
                     else:
-                        # Use original label encoding
-                        features["name"].append(name_to_int(pokemon[format_key]))
+                        features[f"type_{type_}"].append(0)
                 else:
                     features[key].append(pokemon[f"{format_key}"])
     return np.column_stack([features[key] for key in features])
 
-
-
 if __name__ == "__main__":
+
+    if "types" in feature_names:
+        for type_ in partial_types_list:
+            feature_names.append(f"type_{type_}")
+        feature_names.remove("types")
+    np.random.shuffle(feature_names)
+
     # quick check when running the module directly
-    data = list(iter_test_data())
-    components = 2
+    data, pokemon_species_count = list(data_parser.iter_test_data())
+    components = 4 if len(feature_names) > 7 else len(feature_names) - 1
 
-    print("\n\n---- Data Summary ----\n")
-    print(f"Loaded {len(data)} records from data/test.jsonl")
+    log("\n\n---- Data Summary ----\n", color='magenta')
+    log(f"Loaded {len(data)} records from data/train.jsonl", color='magenta')
 
-    # Perform K-Fold Target Encoding
-    print("\n---- K-Fold Target Encoding ----\n")
-    target_encoding_dict = kfold_target_encode_pokemon(data, n_splits=10000, random_state=42)
-    
-    print(f"Generated target encodings for {len(target_encoding_dict)} unique Pokemon species: ")
-    sorted_pokemon = sorted(target_encoding_dict.items(), key=lambda x: x[1], reverse=True)
-    for i, (pokemon_name, encoded_value) in enumerate(sorted_pokemon[:10]):
-        print(f"{i + 1:2}. {pokemon_name:12} - Win rate: {encoded_value:.4f}")
+    if DEBUG:
+        log("\n---- Debug: Pokemon Records ----\n", color='cyan')
+        pokemon_info()
+        log("\n---- End of Debug ----\n", color='cyan')
 
-    # Perform PCA with target encoding
-    print("\n\n---- PCA with Target Encoding ----\n")
-    features_encoded = extract_features_with_encoding(
-        data, 
-        max_elements=10000, 
-        use_target_encoding=True,
-        target_encoding_dict=target_encoding_dict
-    )
+    # Perform PCA
+    log("\n\n---- PCA Analysis ----\n", color='blue')
+    features_encoded = extract_features_with_encoding( data, max_elements=10000 )
 
-    # Show all Pokemon with their encoded values
-    print(f"Pokemon species with target encodings:\n")
-    for i, (pokemon_name, encoded_value) in enumerate(sorted_pokemon):
-        print(f"{i + 1:3}: {pokemon_name:12}\t(Encoded: {encoded_value:.4f})")
-        if i >= 19:
-            break
-    print()
-
+    features_encoded = features_encoded.astype(float)
     if features_encoded.size > 0:
+        # Normalize features except for name and type encodings
+        for col in range(features_encoded.shape[1]):
+
+            if feature_names[col] == "name" or feature_names[col].startswith("type_"):
+                continue  # Skip normalization for name and type encodings
+
+            min_val = 1
+            max_val = 255
+            for row in range(features_encoded.shape[0]):
+                features_encoded[row, col] = (features_encoded[row, col] - min_val) / (max_val - min_val)
+
         pca = PCA(n_components=components)
         transformed = pca.fit_transform(features_encoded)
 
-        # Retrieve the names of the best features
-        best_features = [feature_names[i] for i in pca.components_[0].argsort()[-components:][::-1]]
-        print("Best features and contribution to first principal component:")
-        for i in range(len(best_features)):
-            percentage = pca.explained_variance_ratio_[i] * 100
-            print(f"{best_features[i]}\t-\t{percentage:.2f}%")
+        for i in range(components):
+            # Retrieve the names of the best features
+            best_features = [feature_names[h] for h in pca.components_[i].argsort()[-components:][::-1]]
+            log(f"Best features and contribution to principal component {i + 1}:", color='blue')
+            for j in range(len(best_features)):
+                percentage = pca.explained_variance_ratio_[j] * 100
+                feature_color = "green" if percentage >= 2 else "red"
+
+                log(f"{best_features[j]:<15}\t-", color='blue', tabs=1, end="\t")
+                log(f"{percentage:.2f}%", color=feature_color)
     else:
-        print("No valid features found for PCA.")
+        log("No valid features found for PCA.", color='red')
 
-    # Also show comparison with label encoding
-    print("\n\n---- PCA with Label Encoding (Original) ----\n")
-    features_label = extract_features_with_encoding(
-        data, 
-        max_elements=10000, 
-        use_target_encoding=False
-    )
-    
-    if features_label.size > 0:
-        pca_label = PCA(n_components=components)
-        transformed_label = pca_label.fit_transform(features_label)
-        
-        best_features_label = [feature_names[i] for i in pca_label.components_[0].argsort()[-components:][::-1]]
-        print("Best features and contribution to first principal component:")
-        for i in range(len(best_features_label)):
-            percentage = pca_label.explained_variance_ratio_[i] * 100
-            print(f"{best_features_label[i]}\t-\t{percentage:.2f}%")
-
-
-    print("\n---- End of Summary ----\n\n")
+    log("\n\n---- End of Summary ----\n\n", color='magenta')

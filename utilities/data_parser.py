@@ -2,7 +2,7 @@ from typing import Union, Iterator, Dict, Any
 from pathlib import Path
 import json
 
-def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0) -> tuple[Iterator[Dict[str, Any]], Dict[str, int]]:
+def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0, SECOND_TEAM = False) -> tuple[Iterator[Dict[str, Any]], Dict[str, int]]:
     """
     Yield JSON objects from a JSONL file one by one (memory efficient).
     Additionally, count occurrences of Pokémon in 'p1_team_details'.
@@ -32,6 +32,13 @@ def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0) -> tuple[I
                             pokemon_name = pokemon["name"]
                             if isinstance(pokemon_name, str):
                                 pokemon_count[pokemon_name] = pokemon_count.get(pokemon_name, 0) + 1
+
+                if SECOND_TEAM:
+                    pokemon = entry["p2_lead_details"]
+                    if isinstance(pokemon, dict) and "name" in pokemon:
+                        pokemon_name = pokemon["name"]
+                        if isinstance(pokemon_name, str):
+                            pokemon_count[pokemon_name] = pokemon_count.get(pokemon_name, 0) + 1
 
                 if lineno <= entry_to_print:
                     entry_str = json.dumps(entry, indent=2)

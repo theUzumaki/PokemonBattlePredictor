@@ -1,11 +1,17 @@
-from typing import Union, Iterator, Dict, Any
+from typing import Union, Iterator, Dict, Any, List
 from pathlib import Path
 import json
 
-def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0, SECOND_TEAM = False) -> tuple[Iterator[Dict[str, Any]], Dict[str, int]]:
+def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0, SECOND_TEAM = False, fields_to_look_into: List[str] = None) -> tuple[Iterator[Dict[str, Any]], Dict[str, int]]:
     """
     Yield JSON objects from a JSONL file one by one (memory efficient).
-    Additionally, count occurrences of Pokémon in 'p1_team_details'.
+    Additionally, count occurrences of Pokémon by traversing the specified field path.
+    
+    Args:
+        path: Path to the JSONL file
+        entry_to_print: Number of entries to print for debugging
+        SECOND_TEAM: Whether to include second team's Pokémon
+        fields_to_look_into: List of nested field names to traverse (e.g., ["p1_team_details"])
     """
     if path is None:
         path = Path(__file__).resolve().parent / ".." / "data" / "train.jsonl"
@@ -14,7 +20,10 @@ def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0, SECOND_TEA
     if not path.exists():
         raise FileNotFoundError(f"JSONL file not found: {path}")
 
-    pokemon_count = {}
+    if fields_to_look_into is None:
+        fields_to_look_into = ["p1_team_details"]
+
+    entry_count = {}
 
     entries = []
     with path.open("r", encoding="utf-8") as fh:
@@ -26,19 +35,26 @@ def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0, SECOND_TEA
                 entry = json.loads(line)
                 entries.append(entry)
 
-                if "p1_team_details" in entry and isinstance(entry["p1_team_details"], list):
-                    for pokemon in entry["p1_team_details"]:
-                        if isinstance(pokemon, dict) and "name" in pokemon:
-                            pokemon_name = pokemon["name"]
-                            if isinstance(pokemon_name, str):
-                                pokemon_count[pokemon_name] = pokemon_count.get(pokemon_name, 0) + 1
-
-                if SECOND_TEAM:
-                    pokemon = entry["p2_lead_details"]
-                    if isinstance(pokemon, dict) and "name" in pokemon:
-                        pokemon_name = pokemon["name"]
-                        if isinstance(pokemon_name, str):
-                            pokemon_count[pokemon_name] = pokemon_count.get(pokemon_name, 0) + 1
+                # Navigate through the nested fields
+                current_data = entry
+                field_found = True
+                
+                for field in fields_to_look_into:
+                    if isinstance(current_data, dict) and field in current_data:
+                        current_data = current_data[field]
+                    else:
+                        field_found = False
+                        break
+                
+                # Process the data at the target field
+                if field_found and isinstance(current_data, list):
+                    for entry in current_data:
+                        if isinstance(entry, dict):
+                            key = ''.join(str(value) for value in entry.values())
+                            if key in entry_count:
+                                entry_count[key] += 1
+                            else:
+                                entry_count[key] = 1
 
                 if lineno <= entry_to_print:
                     entry_str = json.dumps(entry, indent=2)
@@ -49,4 +65,4 @@ def iter_test_data(path: Union[str, Path] = None, entry_to_print = 0, SECOND_TEA
             except json.JSONDecodeError as e:
                 raise ValueError(f"Invalid JSON on line {lineno} in {path}: {e.msg}") from e
 
-    return entries, pokemon_count
+    return entries, entry_count

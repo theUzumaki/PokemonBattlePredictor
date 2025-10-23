@@ -10,8 +10,8 @@ import numpy as np
 from utilities.logger import log
 
 
-def normalize_species_counts(
-    species_count: Dict[str, int],
+def normalize_entry_counts(
+    entries_count: Dict[str, int],
     method: str = "inverse_frequency"
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """
@@ -21,14 +21,14 @@ def normalize_species_counts(
     Rare species receive higher weights, while common species receive lower weights.
     
     Example usage:
-        >>> weights, freqs = normalize_species_counts(pokemon_species_count)
+        >>> weights, freqs = normalize_entry_counts(entry_count)
         >>> # Use weights when sampling or training:
         >>> sample_weight = weights[pokemon_name]
         >>> # Or use frequencies for statistical analysis:
         >>> probability = freqs[pokemon_name]
     
     Args:
-        species_count: Dictionary mapping Pokemon names to their occurrence counts
+        entries_count: Dictionary mapping Pokemon names to their occurrence counts
         method: Normalization method to use:
             - "inverse_frequency": Weight inversely proportional to frequency (1/count)
               Best for: Strong class balancing, giving rare classes high importance
@@ -49,11 +49,11 @@ def normalize_species_counts(
           (Frequency = proportion of total, sums to 1.0)
     """
     
-    if not species_count:
+    if not entries_count:
         return {}, {}
     
     # Calculate total count and statistics
-    counts = np.array(list(species_count.values()))
+    counts = np.array(list(entries_count.values()))
     total_count = counts.sum()
     mean_count = counts.mean()
     std_count = counts.std()
@@ -63,7 +63,7 @@ def normalize_species_counts(
     normalized_weights = {}
     normalized_frequencies = {}
     
-    for species_name, count in species_count.items():
+    for species_name, count in entries_count.items():
         # Calculate normalized frequency (probability)
         normalized_frequencies[species_name] = count / total_count
         
@@ -100,49 +100,66 @@ def normalize_species_counts(
     # Normalize weights to sum to the number of unique species (optional, for balance)
     if method in ["inverse_frequency", "sqrt_inverse", "log_inverse"]:
         weight_sum = sum(normalized_weights.values())
-        num_species = len(species_count)
+        num_species = len(entries_count)
         for species_name in normalized_weights:
             normalized_weights[species_name] = (normalized_weights[species_name] / weight_sum) * num_species
     
     return normalized_weights, normalized_frequencies
 
 
-def apply_species_weights_to_data(
+def apply_entry_weights_to_data(
     data: List[Dict[str, Any]],
     normalized_weights: Dict[str, float],
-    weight_key: str = "sample_weight"
+    weight_key: str = "sample_weight",
+    fields_to_look_into: List[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Apply species weights to Pokemon data records.
+    Apply entry weights to data records.
     
     Args:
         data: List of battle records
-        normalized_weights: Dictionary mapping Pokemon names to weights
-        weight_key: Key to store the weight in the Pokemon dictionary
+        normalized_weights: Dictionary mapping entry identifiers to weights
+        weight_key: Key to store the weight in the entry dictionary
     
     Returns:
         Modified data with weights applied
     """
-    for record in data:
-        if "p1_team_details" in record:
-            for pokemon in record["p1_team_details"]:
-                pokemon_name = pokemon.get("name", "")
-                pokemon[weight_key] = normalized_weights.get(pokemon_name, 1.0)
-    
+
+
+    for entry in data:
+        # Navigate through the nested fields
+        current_data = entry
+        field_found = True
+
+        for field in fields_to_look_into:
+            if isinstance(current_data, dict) and field in current_data:
+                current_data = current_data[field]
+            else:
+                field_found = False
+                break
+
+        if not field_found:
+            return None
+
+        for sub_entry in current_data:
+            id = "".join(str(value) for value in sub_entry.values())
+            sub_entry[weight_key] = normalized_weights.get(id, 1.0)
+
     return data
 
 
 def weight_handling(
     data: List[Dict[str, Any]], 
-    pokemon_species_count: Dict[str, int],
-    weighting_method: str = "sqrt_inverse"
+    entry_count: Dict[str, int],
+    weighting_method: str = "sqrt_inverse",
+    fields_to_look_into: List[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Handle species weighting with logging and comparison of methods.
     
     Args:
         data: List of battle records
-        pokemon_species_count: Dictionary mapping Pokemon names to occurrence counts
+        entry_count: Dictionary mapping Pokemon names to occurrence counts
         weighting_method: Normalization method to use
     
     Returns:
@@ -156,27 +173,28 @@ def weight_handling(
     log("Comparing normalization methods for most/least common Pokemon:\n", color='yellow')
     
     # Sort species by frequency (most common first)
-    sorted_species = sorted(pokemon_species_count.items(), key=lambda x: x[1], reverse=True)
-    most_common = sorted_species[0]
-    least_common = sorted_species[-1]
+    sorted_entries = sorted(entry_count.items(), key=lambda x: x[1], reverse=True)
+    most_common = sorted_entries[0]
+    least_common = sorted_entries[-1]
     
     log(f"Most common:  {most_common[0]:<15} (count: {most_common[1]})", color='cyan')
     log(f"Least common: {least_common[0]:<15} (count: {least_common[1]})", color='cyan')
     log(f"\n{'Method':<20} {'Most Common Weight':<20} {'Least Common Weight':<20} {'Ratio':<10}", color='yellow')
     
     for method in normalization_methods:
-        weights, _ = normalize_species_counts(pokemon_species_count, method=method)
+        weights, _ = normalize_entry_counts(entry_count, method=method)
         most_weight = weights[most_common[0]]
         least_weight = weights[least_common[0]]
         ratio = least_weight / most_weight if most_weight > 0 else 0
         log(f"{method:<20} {most_weight:<20.4f} {least_weight:<20.4f} {ratio:<10.2f}x", color='cyan')
     
     # Use the configured method
-    normalized_weights, normalized_frequencies = normalize_species_counts(
-        pokemon_species_count, 
+    normalized_weights, normalized_frequencies = normalize_entry_counts(
+        entry_count, 
         method=weighting_method
     )
     
+    
     # Apply weights to the data
     log("\n\nApplying weights to data samples...", color='yellow')
-    return apply_species_weights_to_data(data, normalized_weights)
+    return apply_entry_weights_to_data(data, normalized_weights, fields_to_look_into=fields_to_look_into)

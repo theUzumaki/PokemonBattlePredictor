@@ -1,0 +1,20 @@
+{
+    "types_list": [
+        "grass", "psychic", "fire", "water", "electric", "ice", "fighting",
+        "poison", "ground", "flying", "bug", "rock", "ghost", "dragon", "dark",
+        "steel", "fairy", "normal"
+    ],
+    "partial_types_list": [
+        "grass", "psychic", "fire", "water", "electric", "ice",
+        "poison", "ground", "flying", "rock", "ghost", "dragon",
+        "normal"
+    ],
+    "debug": true,
+    "use_species_weighting": true,
+    "weighting_method": "sqrt_inverse",
+    "coverage": 0.9,
+    "pca_components": 10,
+    "entry_to_print": 0,
+    "feature_names": ["type", "base_power", "accuracy", "priority"],
+    "fields_to_look_into": ["battle_timeline", "p1_move_details"]
+}

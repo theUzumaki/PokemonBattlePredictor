@@ -12,10 +12,8 @@ import numpy as np
 def extract_features_with_encoding(
     data: List[Dict[str, Any]],
     feature_names: List[str],
-    max_elements: int = float("inf"),
-    target_encoding_dict: Dict[str, float] = None,
     use_sample_weights: bool = False,
-    second_team: bool = False
+    fields_to_look_into: List[str] = None,
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
     Extract features from Pokemon data with optional target encoding for names.
@@ -23,7 +21,6 @@ def extract_features_with_encoding(
     Args:
         data: List of battle records
         feature_names: List of feature names to extract
-        max_elements: Maximum number of records to process
         target_encoding_dict: Dictionary mapping Pokemon names to encoded values
         use_sample_weights: Whether to extract and return sample weights
         second_team: Whether to include the second team's Pokemon in feature extraction
@@ -42,46 +39,39 @@ def extract_features_with_encoding(
     sample_weights = [] if use_sample_weights else None
         
     i = 0
-    for record in data:
-        if i >= max_elements:
-            break
+    for entry in data:
         i += 1
 
-        for pokemon in record["p1_team_details"]:
+        # Navigate through the nested fields
+        current_data = entry
+        field_found = True
+        
+        for field in fields_to_look_into:
+            if isinstance(current_data, dict) and field in current_data:
+                current_data = current_data[field]
+            else:
+                field_found = False
+                break
+
+        if not field_found:
+            continue
+
+        for sub_entry in current_data:
             for key in feature_names:
-                format_key = f"base_{key}"
 
                 if key.startswith("type_"):
                     type_ = key.split("_", 1)[1]
-                    if type_ in pokemon["types"]:
+                    if type_ in sub_entry["types"]:
                         features[f"type_{type_}"].append(1)
                     else:
                         features[f"type_{type_}"].append(0)
                 else:
-                    features[key].append(pokemon[f"{format_key}"])
+                    features[key].append(sub_entry[f"{key}"])
             
             # Extract sample weight if requested
             if use_sample_weights:
-                sample_weights.append(pokemon.get("sample_weight", 1.0))
+                sample_weights.append(sub_entry.get("sample_weight", 1.0))
 
-        if second_team:
-            pokemon = record["p2_lead_details"]
-            for key in feature_names:
-                format_key = f"base_{key}"
-
-                if key.startswith("type_"):
-                    type_ = key.split("_", 1)[1]
-                    if type_ in pokemon["types"]:
-                        features[f"type_{type_}"].append(1)
-                    else:
-                        features[f"type_{type_}"].append(0)
-                else:
-                    features[key].append(pokemon[f"{format_key}"])
-            
-            # Extract sample weight if requested
-            if use_sample_weights:
-                sample_weights.append(pokemon.get("sample_weight", 1.0))
-    
     features_array = np.column_stack([features[key] for key in features])
     
     if use_sample_weights:

@@ -1,5 +1,5 @@
 {
-  "feature_names": ["atk", "hp", "def", "types", "spa", "spd", "spe"],
+  "feature_names": ["base_atk", "base_hp", "base_def", "types", "base_spa", "base_spd", "base_spe", "level"],
   "types_list": [
     "grass", "psychic", "fire", "water", "electric", "ice", "fighting",
     "poison", "ground", "flying", "bug", "rock", "ghost", "dragon", "dark",

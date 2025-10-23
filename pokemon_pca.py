@@ -1,9 +1,9 @@
 from sklearn.discriminant_analysis import StandardScaler
 import utilities.data_parser as data_parser
 from utilities.logger import log
-from utilities.normalizer import normalize_species_counts, apply_species_weights_to_data, weight_handling
+from utilities.normalizer import weight_handling
 from utilities.feature_extractor import extract_features_with_encoding
-from utilities.debug_utils import pokemon_info
+from utilities.debug_utils import dataset_info
 from typing import List, Dict, Any, Tuple
 from sklearn.decomposition import PCA
 import numpy as np
@@ -12,7 +12,7 @@ import json
 import os
 
 # Load configuration from config file
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "configs", "pkmn.json")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "configs", "move.json")
 
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load configuration from JSON file."""
@@ -29,7 +29,6 @@ config = load_config(CONFIG_PATH)
 
 # Extract configuration values
 DEBUG = config.get("debug", False)
-SECOND_TEAM = config.get("second_team", False)  # Whether to include the second team's Pokémon in feature extraction
 USE_SPECIES_WEIGHTING = config.get("use_species_weighting", True)  # Enable/disable species-based weighting for class balancing
 WEIGHTING_METHOD = config.get("weighting_method", "sqrt_inverse")  # Method: "inverse_frequency", "sqrt_inverse", "log_inverse", "min_max", "z_score"
 COVERAGE = config.get("coverage", 0.9)  # Target cumulative explained variance coverage for PCA
@@ -37,7 +36,8 @@ ENTRY_TO_PRINT = config.get("entry_to_print", 0)  # Number of data entries to pr
 FIELDS_TO_LOOK_INTO = config.get("fields_to_look_into", ["p1_team_details"])  # Nested field path to extract Pokémon data from
 
 entry = []
-entry_count = defaultdict(int)  # Counter for Pokémon species occurrences
+entry_count = {}  # Counter for occurrences
+entry_resume = {}  # Store a sample entry for each unique entry
 feature_names = config.get("feature_names", ["atk", "hp", "def", "types", "spa", "spd", "spe"])
 types_list = config.get("types_list", ["grass", "psychic", "fire", "water", "electric", "ice", "fighting",
                 "poison", "ground", "flying", "bug", "rock", "ghost", "dragon", "dark",
@@ -61,12 +61,11 @@ if __name__ == "__main__":
     np.random.shuffle(feature_names)
 
     # quick check when running the module directly
-    data, entry_count = list(data_parser.iter_test_data(
-        entry_to_print=ENTRY_TO_PRINT, 
-        SECOND_TEAM=SECOND_TEAM,
+    data, entry_count, entry_resume = list(data_parser.iter_test_data(
+        entry_to_print=ENTRY_TO_PRINT,
         fields_to_look_into=FIELDS_TO_LOOK_INTO
     ))
-    components = config.get("pca_components", 10) if len(feature_names) > 7 else len(feature_names) - 1
+    components = config.get("pca_components", 10) if len(feature_names) > 10 else len(feature_names) - 1
 
 
     log("\n\n---- Data Summary ----\n", color='magenta')
@@ -83,16 +82,17 @@ if __name__ == "__main__":
     normalized_weights = None
     normalized_frequencies = None
     
-    # Apply species normalization if enabled
-    if USE_SPECIES_WEIGHTING:
-        data = weight_handling(data, entry_count, WEIGHTING_METHOD)
-    else:
-        log("\n\nSpecies weighting is DISABLED. Using uniform weights.", color='yellow')
-
     if DEBUG:
         log("\n---- Debug: Pokemon Records ----\n", color='cyan')
-        pokemon_info(data, feature_names, entry_count, fields_to_look_into=FIELDS_TO_LOOK_INTO)
+        dataset_info(data=entry_resume, feature_names=feature_names, entry_count=entry_count)
         log("\n---- End of Debug ----\n", color='cyan')
+
+
+    # Apply species normalization if enabled
+    if USE_SPECIES_WEIGHTING:
+        data = weight_handling(data, entry_count, WEIGHTING_METHOD, fields_to_look_into=FIELDS_TO_LOOK_INTO)
+    else:
+        log("\n\nSpecies weighting is DISABLED. Using uniform weights.", color='yellow')
 
     # Perform PCA
     log("\n\n---- PCA Analysis ----\n", color='blue')
@@ -100,13 +100,13 @@ if __name__ == "__main__":
     # Extract features with optional sample weights
     if USE_SPECIES_WEIGHTING:
         features_encoded, sample_weights = extract_features_with_encoding(
-            data, feature_names, max_elements=10000, use_sample_weights=True, second_team=SECOND_TEAM
+            data, feature_names, fields_to_look_into=FIELDS_TO_LOOK_INTO, use_sample_weights=True
         )
         log(f"Using weighted PCA with {len(sample_weights)} samples", color='blue')
         log(f"Weight statistics: min={sample_weights.min():.4f}, max={sample_weights.max():.4f}, mean={sample_weights.mean():.4f}\n", color='blue')
     else:
         features_encoded = extract_features_with_encoding(
-            data, feature_names, max_elements=10000, use_sample_weights=False, second_team=SECOND_TEAM
+            data, feature_names, fields_to_look_into=FIELDS_TO_LOOK_INTO, use_sample_weights=False
         )
         sample_weights = None
         log(f"Using unweighted PCA with {features_encoded.shape[0]} samples\n", color='blue')

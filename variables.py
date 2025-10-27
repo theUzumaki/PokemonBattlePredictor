@@ -37,9 +37,17 @@ class team:
     pkmns: list[pkmn] # length 6
 
 @dataclass
+class adv_team:
+    pkmn_alive: int
+    pkmn_dscvrd_alive: int
+    types: list[str]
+    statuses: list[str]
+    hp_leader: float
+
+@dataclass
 class battle:
     team1: team
-    team2: team
+    team2: adv_team
 
 @dataclass
 class battleline:

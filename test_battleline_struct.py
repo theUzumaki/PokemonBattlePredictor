@@ -171,40 +171,86 @@ team1 = v.team(
 )
 
 team2 = v.team(
-    pkmns=[exeggutor, 
-           v.pkmn(id="rhydon", hps=0.85, type1="ground", type2="rock",
-                  base_stats=v.stats(atk=130, def_=120, spa=45, spd=45, spe=40, hp=105),
-                  moves=[], status="nostatus", effects=["noeffect"], boosts=neutral_boosts),
-           v.pkmn(id="golem", hps=0.70, type1="rock", type2="ground",
-                  base_stats=v.stats(atk=120, def_=130, spa=55, spd=65, spe=45, hp=80),
-                  moves=[], status="brn", effects=["noeffect"], boosts=neutral_boosts),
-           v.pkmn(id="zapdos", hps=1.0, type1="electric", type2="flying",
-                  base_stats=v.stats(atk=90, def_=85, spa=125, spd=90, spe=100, hp=90),
-                  moves=[], status="nostatus", effects=["noeffect"], boosts=neutral_boosts),
-           v.pkmn(id="articuno", hps=0.55, type1="ice", type2="flying",
-                  base_stats=v.stats(atk=85, def_=100, spa=125, spd=125, spe=85, hp=90),
-                  moves=[], status="nostatus", effects=["noeffect"], boosts=neutral_boosts),
-           v.pkmn(id="moltres", hps=0.45, type1="fire", type2="flying",
-                  base_stats=v.stats(atk=100, def_=90, spa=125, spd=85, spe=90, hp=90),
-                  moves=[], status="tox", effects=["noeffect"], boosts=neutral_boosts)]
+    pkmns=[exeggutor, chansey, starmie, alakazam, snorlax,
+           v.pkmn(id="filler2", hps=0.5, type1="normal", type2="notype", 
+                  base_stats=neutral_boosts, moves=[], status="nostatus", 
+                  effects=[], boosts=neutral_boosts)]
 )
 
-# Create a battle
+team3 = v.team(
+    pkmns=[tauros, snorlax, alakazam,
+           v.pkmn(id="zapdos", hps=0.80, type1="electric", type2="flying",
+                  base_stats=v.stats(atk=90, def_=85, spa=125, spd=90, spe=100, hp=90),
+                  moves=[thunderbolt], status="nostatus", effects=["noeffect"], boosts=neutral_boosts),
+           v.pkmn(id="rhydon", hps=0.30, type1="ground", type2="rock",
+                  base_stats=v.stats(atk=130, def_=120, spa=45, spd=45, spe=40, hp=105),
+                  moves=[], status="par", effects=["noeffect"], boosts=neutral_boosts),
+           v.pkmn(id="lapras", hps=0.95, type1="water", type2="ice",
+                  base_stats=v.stats(atk=85, def_=80, spa=125, spd=95, spe=60, hp=130),
+                  moves=[ice_beam], status="nostatus", effects=["reflect"], boosts=boosted_stats)]
+)
+
+# Create adversary teams using the new adv_team structure
+adv_team1 = v.adv_team(
+    pkmn_alive=6,
+    pkmn_dscvrd_alive=5,  # 5 out of 6 discovered
+    types=["grass", "psychic", "ground", "rock", "electric", "flying", "ice", "fire"],
+    statuses=["frz", "nostatus", "brn", "nostatus", "nostatus", "tox"],
+    hp_leader=0.689  # HP of the leading Pokemon (exeggutor)
+)
+
+adv_team2 = v.adv_team(
+    pkmn_alive=5,
+    pkmn_dscvrd_alive=4,  # 4 out of 5 discovered
+    types=["water", "psychic", "normal"],
+    statuses=["nostatus", "nostatus", "par", "nostatus"],
+    hp_leader=1.0  # HP of the leading Pokemon (starmie)
+)
+
+adv_team3 = v.adv_team(
+    pkmn_alive=4,
+    pkmn_dscvrd_alive=4,
+    types=["fire", "flying", "dragon", "psychic"],
+    statuses=["brn", "nostatus", "nostatus", "par"],
+    hp_leader=0.45
+)
+
+adv_team4 = v.adv_team(
+    pkmn_alive=6,
+    pkmn_dscvrd_alive=3,
+    types=["electric", "water", "ice", "normal"],
+    statuses=["nostatus", "nostatus", "nostatus", "frz", "nostatus", "nostatus"],
+    hp_leader=0.88
+)
+
+# Create battles with more variety
 battle1 = v.battle(
     team1=team1,
-    team2=team2
+    team2=adv_team1
 )
 
 battle2 = v.battle(
-    team1=team2,  # Swap teams for variety
-    team2=team1
+    team1=team1,
+    team2=adv_team2
 )
 
-# Create the battleline structure
+battle3 = v.battle(
+    team1=team2,  # Different team1
+    team2=adv_team3
+)
+
+battle4 = v.battle(
+    team1=team3,  # Another different team1
+    team2=adv_team4
+)
+
+# Create the battleline structure with more battles
 example_battleline = v.battleline(
     battles={
         1: battle1,
-        2: battle2
+        2: battle2,
+        3: battle3,
+        4: battle4
     }
 )
 
@@ -219,9 +265,12 @@ def print_battleline_info(battleline: v.battleline):
         for i, pkmn in enumerate(battle.team1.pkmns[:3], 1):  # Show first 3
             print(f"    {i}. {pkmn.id} ({pkmn.type1}/{pkmn.type2}) - HP: {pkmn.hps*100:.1f}%, Status: {pkmn.status}")
         
-        print(f"  Team 2: {len(battle.team2.pkmns)} Pokemon")
-        for i, pkmn in enumerate(battle.team2.pkmns[:3], 1):  # Show first 3
-            print(f"    {i}. {pkmn.id} ({pkmn.type1}/{pkmn.type2}) - HP: {pkmn.hps*100:.1f}%, Status: {pkmn.status}")
+        print(f"  Adversary Team (Team 2):")
+        print(f"    Pokemon Alive: {battle.team2.pkmn_alive}")
+        print(f"    Pokemon Discovered Alive: {battle.team2.pkmn_dscvrd_alive}")
+        print(f"    Types: {battle.team2.types}")
+        print(f"    Statuses: {battle.team2.statuses}")
+        print(f"    HP Leader: {battle.team2.hp_leader*100:.1f}%")
         print()
 
 if __name__ == "__main__":
@@ -240,6 +289,9 @@ if __name__ == "__main__":
     print(f"  Moves: {[move.name for move in example_battleline.battles[1].team1.pkmns[0].moves]}")
     print(f"  Boosts: SPA={example_battleline.battles[1].team1.pkmns[0].boosts.spa}")
     
-    print("\nBattle 1, Team 2, First Pokemon: {example_battleline.battles[1].team2.pkmns[0].id}")
-    print(f"  Status: {example_battleline.battles[1].team2.pkmns[0].status}")
-    print(f"  Effects: {example_battleline.battles[1].team2.pkmns[0].effects}")
+    print("\nBattle 1, Adversary Team (Team 2):")
+    print(f"  Pokemon Alive: {example_battleline.battles[1].team2.pkmn_alive}")
+    print(f"  Pokemon Discovered Alive: {example_battleline.battles[1].team2.pkmn_dscvrd_alive}")
+    print(f"  Types: {example_battleline.battles[1].team2.types}")
+    print(f"  Statuses: {example_battleline.battles[1].team2.statuses}")
+    print(f"  HP Leader: {example_battleline.battles[1].team2.hp_leader}")

@@ -35,6 +35,7 @@ class pkmn:
 @dataclass
 class team:
     pkmns: list[pkmn] # length 6
+    revealed: int
 
 @dataclass
 class adv_team:

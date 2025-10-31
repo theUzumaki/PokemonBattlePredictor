@@ -6,10 +6,11 @@ import json
 from variables import pkmn, move
 from variables import team, stats, adv_team
 from variables import battle as Battle
+from variables import battleline as Battleline
 def create_final_turn_feature(data: list[dict]) -> pd.DataFrame:
-    battle_ = Battle(team1=None, team2=None)
-    for battle in data:
-        
+    battleline = Battleline(battles = {})
+    for i, battle in enumerate(data):
+        battle_ = Battle(team1=None, team2=None)
         #print(battle)
         party1_details, party2_details = battle['p1_team_details'], battle['p2_lead_details']
         team1 = init_team_1(party1_details)
@@ -75,16 +76,14 @@ def create_final_turn_feature(data: list[dict]) -> pd.DataFrame:
 
           
 
-        # last seen pokemon battle layout
-        #lead_hp_1 = battle['battle_timeline'][-1]['p1_pokemon_state']['hp_pct']
         lead_hp_2 = battle['battle_timeline'][-1]['p2_pokemon_state']['hp_pct']
         team2.hp_leader = lead_hp_2
-        #teams[0]['lead_hp'] = lead_hp_1
-        #teams[1]['lead_hp'] = lead_hp_2
+       
         team1.revealed = len(found_in_starting_team)
         battle_.team1 = team1
         battle_.team2 = team2
-        return battle_
+        battleline.battles[i] = battle_
+    return battleline   
 def parse_turn_status_team1(poke1_state):
     if poke1_state['status'] == 'nostatus':
         return None

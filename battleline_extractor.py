@@ -7,10 +7,29 @@ from variables import pkmn, move
 from variables import team, stats, adv_team
 from variables import battle as Battle
 from variables import battleline as Battleline
-def create_final_turn_feature(data: list[dict]) -> pd.DataFrame:
+
+def create_final_turn_feature(data: list[dict], is_train: bool = True) -> pd.DataFrame:
+    """Create a battleline struct from raw JSON battle records.
+
+    Args:
+        data: list of battle dicts (parsed from JSONL)
+        is_train: if True, expects each record to contain 'player_won' and will
+                  populate the battle.win label. If False, the label will be set
+                  to -1 to indicate unknown (useful for test data).
+
+    Returns:
+        Battleline dataclass instance containing parsed battles.
+    """
+
     battleline = Battleline(battles = {})
     for i, battle in enumerate(data):
-        battle_ = Battle(team1=None, team2=None, win=battle['player_won'])
+        # If training data, read the label; otherwise set to -1 (unknown)
+        if is_train:
+            win_label = battle['player_won']
+        else:
+            win_label = -1
+
+        battle_ = Battle(team1=None, team2=None, win=win_label)
         #print(battle)
         party1_details, party2_details = battle['p1_team_details'], battle['p2_lead_details']
         team1 = init_team_1(party1_details)

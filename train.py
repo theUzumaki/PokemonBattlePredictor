@@ -15,7 +15,18 @@ import battleline_extractor as be
 from load_into_pca import perform_pca_on_battles
 from battleline_extractor import create_final_turn_feature
 import chronicle.logger as logger
+from utilities.time_utils import utc_iso_now
 
+# Global config: default test set size for train/test split.
+# Set to 0.0 to use the full dataset for training (no test split).
+TEST_SIZE = 0.0
+# Global default number of PCA components to use during training
+N_COMPONENTS = 200
+# Global default threshold used to convert predicted probabilities to binary labels
+THRESHOLD = 0.5
+
+
+#ATTENZIONE!!!! DA CAMBIARE IN LOGISTIC REGRESSION??!!??!!?!?!
 
 def get_labels_from_battleline(battleline: v.battleline):
     """Extract win/loss labels from battleline."""
@@ -30,7 +41,8 @@ def train_model(
     n_components: int = 10,
     use_ridge: bool = True,
     alpha: float = 1.0,
-    test_size: float = 0.2
+    test_size: float = 0.2,
+    threshold: float = 0.5,
 ):
     """
     Train a linear regression model on PCA features.
@@ -61,12 +73,23 @@ def train_model(
     )
     logger.log(1, 0, 1, logger.Colors.INFO, f"Feature shape: {pca_features.shape}")
     
-    # Step 3: Split data
+    # Step 3: Split data (optionally skip test split by setting test_size <= 0)
     logger.log_step(3, 4, f"Splitting data (test={test_size*100:.0f}%)")
-    X_train, X_test, y_train, y_test = train_test_split(
-        pca_features, labels, test_size=test_size, random_state=42
-    )
-    logger.log(1, 0, 1, logger.Colors.INFO, f"Train: {len(X_train)}, Test: {len(X_test)}")
+    if test_size is None:
+        test_size = 0.0
+
+    if test_size > 0.0:
+        X_train, X_test, y_train, y_test = train_test_split(
+            pca_features, labels, test_size=test_size, random_state=42
+        )
+        logger.log(1, 0, 1, logger.Colors.INFO, f"Train: {len(X_train)}, Test: {len(X_test)}")
+    else:
+        # Use full dataset for training when test_size <= 0
+        X_train = pca_features
+        y_train = labels
+        X_test = np.empty((0, pca_features.shape[1]))
+        y_test = np.empty((0,))
+        logger.log(1, 0, 1, logger.Colors.INFO, f"Train: {len(X_train)}, Test: {len(X_test)} (no test split)")
     
     # Step 4: Train model
     logger.log_step(4, 4, "Training model")
@@ -80,20 +103,31 @@ def train_model(
     model.fit(X_train, y_train)
     
     # Evaluate
-    train_pred = (model.predict(X_train) >= 0.5).astype(int)
-    test_pred = (model.predict(X_test) >= 0.5).astype(int)
-    
+    train_pred = (model.predict(X_train) >= threshold).astype(int)
     train_acc = accuracy_score(y_train, train_pred)
-    test_acc = accuracy_score(y_test, test_pred)
+
+    if X_test.shape[0] > 0:
+        test_pred = (model.predict(X_test) >= threshold).astype(int)
+        test_acc = accuracy_score(y_test, test_pred)
+    else:
+        test_acc = None
     
     logger.log_section_header("RESULTS")
     logger.log(0, 0, 0, logger.Colors.BRIGHT_GREEN + logger.Colors.BOLD, f"Train Accuracy: {train_acc:.4f} ({train_acc*100:.2f}%)")
-    logger.log(0, 0, 1, logger.Colors.BRIGHT_GREEN + logger.Colors.BOLD, f"Test Accuracy:  {test_acc:.4f} ({test_acc*100:.2f}%)")
+    if test_acc is not None:
+        logger.log(0, 0, 1, logger.Colors.BRIGHT_GREEN + logger.Colors.BOLD, f"Test Accuracy:  {test_acc:.4f} ({test_acc*100:.2f}%)")
+    else:
+        logger.log(0, 0, 1, logger.Colors.BRIGHT_GREEN + logger.Colors.BOLD, "Test Accuracy:  N/A (no test split)")
     
     return {
         'model': model,
         'pca_model': pca_model,
         'scaler': scaler,
+        'n_components': n_components,
+        'use_ridge': use_ridge,
+        'alpha': alpha,
+        'test_size': test_size,
+        'threshold': threshold,
         'train_accuracy': train_acc,
         'test_accuracy': test_acc,
         'X_train': X_train,
@@ -118,6 +152,65 @@ def save_model(result, filepath='models/trained_model.pkl'):
         pickle.dump(model_package, f)
     
     logger.log_success(f"Model saved to: {filepath}", newline_before=1, newline_after=1)
+
+
+def save_model_run(result, models_root: str = 'models', prefix: str = 'model'):
+    """Save the model and a params.txt inside a sequential run folder under models_root.
+
+    The function will create models_root/ if missing, then create models_root/{prefix}_{N}
+    where N is the next integer sequence (starting at 1). Inside the run folder it
+    writes 'trained_model.pkl' and 'params.txt' with run metadata.
+    """
+    from pathlib import Path
+
+    root = Path(models_root)
+    root.mkdir(parents=True, exist_ok=True)
+
+    existing = [p.name for p in root.iterdir() if p.is_dir() and p.name.startswith(f"{prefix}_")]
+    nums = []
+    for name in existing:
+        try:
+            nums.append(int(name.split("_")[-1]))
+        except Exception:
+            continue
+    next_n = max(nums) + 1 if nums else 1
+    run_dir = root / f"{prefix}_{next_n}"
+    run_dir.mkdir()
+
+    # Save model package
+    model_file = run_dir / 'trained_model.pkl'
+    model_package = {
+        'model': result['model'],
+        'pca_model': result['pca_model'],
+        'scaler': result['scaler']
+    }
+    with model_file.open('wb') as fh:
+        pickle.dump(model_package, fh)
+
+    # Prepare params
+    total_battles = 0
+    if 'y_train' in result and 'y_test' in result:
+        total_battles = len(result['y_train']) + len(result['y_test'])
+
+    params = [
+        ('model_file', str(model_file)),
+        ('n_components', str(result.get('n_components', ''))),
+        ('use_ridge', str(result.get('use_ridge', ''))),
+        ('alpha', str(result.get('alpha', ''))),
+        ('test_size', str(result.get('test_size', ''))),
+        ('prediction_threshold', str(result.get('threshold', ''))),
+        ('train_accuracy', str(result.get('train_accuracy', ''))),
+        ('test_accuracy', str(result.get('test_accuracy', ''))),
+        ('num_battles', str(total_battles)),
+        ('run_timestamp', utc_iso_now())
+    ]
+
+    params_file = run_dir / 'params.txt'
+    with params_file.open('w', encoding='utf-8') as fh:
+        for k, v in params:
+            fh.write(f"{k}: {v}\n")
+
+    logger.log_success(f"Model run saved to: {run_dir}", newline_before=1, newline_after=1)
 
 
 def load_model(filepath='models/trained_model.pkl'):
@@ -178,13 +271,14 @@ if __name__ == "__main__":
     # Train model
     result = train_model(
         battleline=battleline_struct,
-        n_components=175,
+        n_components=N_COMPONENTS,
         use_ridge=True,
         alpha=1.0,
-        test_size=0.2
+        test_size=TEST_SIZE,
+        threshold=THRESHOLD
     )
     
-    # Save model
-    save_model(result, 'models/trained_model.pkl')
+    # Save model into a sequential run folder under models/
+    save_model_run(result, models_root='models', prefix='model')
 
     logger.log_final_result(True, "Training complete!")

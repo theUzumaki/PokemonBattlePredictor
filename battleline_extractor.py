@@ -10,7 +10,7 @@ from variables import battleline as Battleline
 def create_final_turn_feature(data: list[dict]) -> pd.DataFrame:
     battleline = Battleline(battles = {})
     for i, battle in enumerate(data):
-        battle_ = Battle(team1=None, team2=None)
+        battle_ = Battle(team1=None, team2=None, win=battle['player_won'])
         #print(battle)
         party1_details, party2_details = battle['p1_team_details'], battle['p2_lead_details']
         team1 = init_team_1(party1_details)
@@ -55,7 +55,7 @@ def create_final_turn_feature(data: list[dict]) -> pd.DataFrame:
                     team1_moves.add(move_.name)
                     team1.pkmns[idx_team].moves.append(move(
                         name=move_.name,
-                        cat=move_.cat,
+                        cat= 1 if move_.cat == 'physical' else 0,
                         type=move_.type,
                         base_pwr=move_.base_pwr,
                         accuracy=move_.accuracy,
@@ -67,7 +67,7 @@ def create_final_turn_feature(data: list[dict]) -> pd.DataFrame:
                     team2_moves.add(move2_.name)
                     team2.types.append(move(
                         name=move2_.name,
-                        cat=move2_.cat,
+                        cat= 1 if move2_.cat == 'physical' else 0,
                         type=move2_.type,
                         base_pwr=move2_.base_pwr,
                         accuracy=move2_.accuracy,

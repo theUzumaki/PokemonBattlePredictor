@@ -5,13 +5,15 @@ Uses Linear Regression on PCA-transformed features.
 
 import numpy as np
 from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.metrics import accuracy_score, mean_squared_error
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 import pickle
+import json
 
 import variables as v
 import battleline_extractor as be
 from load_into_pca import perform_pca_on_battles
+from battleline_extractor import create_final_turn_feature
 import chronicle.logger as logger
 
 
@@ -159,14 +161,24 @@ def predict(battleline: v.battleline, model_package, threshold=0.5):
 
 
 if __name__ == "__main__":
-    from test_battleline_struct import example_battleline
     
     logger.log_info("Training on example data...", newline_before=1)
+
+    train_data = []
+    with open("data/train.jsonl", 'r') as f:
+        for line in f:
+            # json.loads() parses one line (one JSON object) into a Python dictionary
+            line = line.strip()
+            if line:  # Skip empty lines
+                train_data.append(json.loads(line))
+
+    # Create battleline struct
+    battleline_struct = be.create_final_turn_feature(train_data)
     
     # Train model
     result = train_model(
-        battleline=example_battleline,
-        n_components=10,
+        battleline=battleline_struct,
+        n_components=175,
         use_ridge=True,
         alpha=1.0,
         test_size=0.2

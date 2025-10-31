@@ -1,12 +1,8 @@
 import variables as v
-import battleline_extractor as be
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from typing import List, Dict, Any
 import chronicle.logger as logger
-
-from test_battleline_struct import example_battleline as example
 
 
 def extract_battle_features(battleline: v.battleline, max_moves: int = 4) -> np.ndarray:

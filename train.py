@@ -56,7 +56,6 @@ def train_model(
     pca_model, pca_features, scaler, _, feature_names = perform_pca_on_battles(
         battleline=battleline,
         n_components=n_components,
-        use_individual_pokemon=False
     )
     logger.log(1, 0, 1, logger.Colors.INFO, f"Feature shape: {pca_features.shape}")
     

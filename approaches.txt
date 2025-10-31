@@ -1,0 +1,36 @@
+LINEAR REGRESSION
+
+1️⃣ Team-level features (static before the match)
+
+For each team:
+
+Average stats of all Pokémon: HP, Attack, Defense, Sp. Atk, Sp. Def, Speed
+Type coverage: number of unique types (e.g., Fire, Water, etc.)
+Average base power of moves
+Number of Pokémon with status moves, healing, etc.
+
+You’d then make difference features between Team A and Team B:
+avg_attack_diff = avg_attack_teamA - avg_attack_teamB
+avg_speed_diff = avg_speed_teamA - avg_speed_teamB
+etc....
+
+2️⃣ Match-level features (dynamic summary)
+
+Extract statistics from the turn-by-turn log:
+
+Total damage dealt per team
+Number of switch-ins / knockouts
+Number of status inflictions (burn, paralysis, etc.)
+Number of critical hits
+These summarize how the battle evolved, so the model can learn from match dynamics too.
+
+
+OPTIONAL:
+3️⃣ Pokémon-level features (optional advanced step)
+If you want to go deeper, flatten the teams:
+Create aggregate features like “max HP Pokémon”, “fastest Pokémon”, etc.
+Encode individual Pokémon using numeric stats and then average or concatenate.
+
+
+
+// check types of your team against adversary team ability coverage

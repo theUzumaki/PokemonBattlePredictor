@@ -48,6 +48,7 @@ class adv_team:
 class battle:
     team1: team
     team2: adv_team
+    win: int
 
 @dataclass
 class battleline:

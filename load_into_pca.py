@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from typing import List, Dict, Any
+import chronicle.logger as logger
 
 from test_battleline_struct import example_battleline as example
 
@@ -351,11 +352,11 @@ def perform_pca_on_battles(battleline: v.battleline, n_components: int = 10, max
         Tuple of (pca_model, transformed_data, scaler, feature_matrix, feature_names)
     """
     mode_str = "INDIVIDUAL POKEMON" if use_individual_pokemon else "AGGREGATED TEAM"
-    print(f"Extracting battle-level features ({mode_str} mode)...")
+    logger.log_info(f"Extracting battle-level features ({mode_str} mode)")
     features = extract_battle_features(battleline, max_moves=max_moves, use_individual_pokemon=use_individual_pokemon)
-    print(f"Extracted features shape: {features.shape}")
-    print(f"Total battles: {features.shape[0]}")
-    print(f"Features per battle: {features.shape[1]}")
+    logger.log(1, 0, 0, logger.Colors.INFO, f"Extracted features shape: {features.shape}")
+    logger.log(1, 0, 0, logger.Colors.INFO, f"Total battles: {features.shape[0]}")
+    logger.log(1, 0, 1, logger.Colors.INFO, f"Features per battle: {features.shape[1]}")
     
     # Build feature names
     status_list = ['nostatus', 'slp', 'frz', 'tox', 'brn', 'par', 'fnt', 'psn']
@@ -400,45 +401,46 @@ def perform_pca_on_battles(battleline: v.battleline, n_components: int = 10, max
     feature_names.extend([f'team2_has_status_{s}' for s in status_list])
     
     if use_individual_pokemon:
-        print(f"\nFeature categories ({len(feature_names)} total):")
-        print(f"  Individual Pokemon features: {max_pokemon} Pokemon × {(len(feature_names) - 30) // max_pokemon} features each")
-        print(f"  Team2 basic: 3 features")
-        print(f"  Team2 types: {len(type_list)} features")
-        print(f"  Team2 status presence: {len(status_list)} features")
+        logger.log(0, 1, 0, logger.Colors.CYAN, f"Feature categories ({len(feature_names)} total):")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Individual Pokemon features: {max_pokemon} Pokemon × {(len(feature_names) - 30) // max_pokemon} features each")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team2 basic: 3 features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team2 types: {len(type_list)} features")
+        logger.log(1, 0, 1, logger.Colors.INFO, f"Team2 status presence: {len(status_list)} features")
     else:
-        print(f"\nFeature categories ({len(feature_names)} total):")
-        print(f"  Team1 basic: 2 features")
-        print(f"  Team1 base stats: 6 features")
-        print(f"  Team1 boosts: 5 features")
-        print(f"  Team1 status counts: {len(status_list)} features")
-        print(f"  Team1 effect counts: {len(effects_list)} features")
-        print(f"  Team1 move stats: 5 features")
-        print(f"  Team2 basic: 3 features")
-        print(f"  Team2 types: {len(type_list)} features")
-        print(f"  Team2 status presence: {len(status_list)} features")
+        logger.log(0, 1, 0, logger.Colors.CYAN, f"Feature categories ({len(feature_names)} total):")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team1 basic: 2 features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team1 base stats: 6 features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team1 boosts: 5 features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team1 status counts: {len(status_list)} features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team1 effect counts: {len(effects_list)} features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team1 move stats: 5 features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team2 basic: 3 features")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"Team2 types: {len(type_list)} features")
+        logger.log(1, 0, 1, logger.Colors.INFO, f"Team2 status presence: {len(status_list)} features")
     
-    print("\nStandardizing features...")
+    logger.log_info("Standardizing features...", newline_before=1)
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
     
-    print(f"Performing PCA with {n_components} components...")
+    n_components = min(n_components, features.shape[0], features.shape[1])
+    logger.log_info(f"Performing PCA with {n_components} components...")
     pca = PCA(n_components=n_components)
     features_pca = pca.fit_transform(features_scaled)
     
-    print(f"\nPCA Results:")
-    print(f"Transformed data shape: {features_pca.shape}")
-    print(f"Explained variance ratio: {pca.explained_variance_ratio_}")
-    print(f"Cumulative explained variance: {np.cumsum(pca.explained_variance_ratio_)}")
+    logger.log_subsection("PCA Results")
+    logger.log(0, 0, 0, logger.Colors.INFO, f"Transformed data shape: {features_pca.shape}")
+    logger.log(0, 0, 0, logger.Colors.INFO, f"Explained variance ratio: {pca.explained_variance_ratio_}")
+    logger.log(0, 0, 1, logger.Colors.INFO, f"Cumulative explained variance: {np.cumsum(pca.explained_variance_ratio_)}")
     
     # Print top contributing features for each component
-    print("\nTop 10 contributing features for each component:")
+    logger.log(0, 1, 0, logger.Colors.CYAN, "Top 10 contributing features for each component:")
     components = pca.components_
     for i, component in enumerate(components):
         if pca.explained_variance_ratio_[i] > 0.01:  # Only show components explaining >1% variance
             top_indices = np.argsort(np.abs(component))[-10:][::-1]
-            print(f"\nPC{i+1} (explains {pca.explained_variance_ratio_[i]*100:.2f}% of variance):")
+            logger.log(0, 1, 0, logger.Colors.BRIGHT_BLUE, f"PC{i+1} (explains {pca.explained_variance_ratio_[i]*100:.2f}% of variance):")
             for idx in top_indices:
-                print(f"  {feature_names[idx]}: {component[idx]:.4f}")
+                logger.log(1, 0, 0, logger.Colors.DIM, f"{feature_names[idx]}: {component[idx]:.4f}")
     
     return pca, features_pca, scaler, features, feature_names
 
@@ -447,19 +449,17 @@ def main():
     # Use the example battleline struct from test_battleline_struct.py
     battleline_struct = example
     
-    print(f"Battleline contains {len(battleline_struct.battles)} battles")
+    logger.log_info(f"Battleline contains {len(battleline_struct.battles)} battles")
     total_pokemon = sum(len(battle.team1.pkmns) for battle in battleline_struct.battles.values())
-    print(f"Total Pokemon in team1 across all battles: {total_pokemon}")
-    print(f"Total adversary teams (team2): {len(battleline_struct.battles)}\n")
+    logger.log_info(f"Total Pokemon in team1 across all battles: {total_pokemon}")
+    logger.log_info(f"Total adversary teams (team2): {len(battleline_struct.battles)}", newline_after=1)
     
     # Choose mode: False for aggregated, True for individual
     use_individual = True  # Change this to True to use individual Pokemon features
     
     # Perform PCA on battle-level features (combining both teams)
-    print("=" * 80)
     mode_name = "INDIVIDUAL POKEMON MODE" if use_individual else "AGGREGATED TEAM MODE"
-    print(f"BATTLE-LEVEL PCA ANALYSIS ({mode_name})")
-    print("=" * 80)
+    logger.log_section_header(f"BATTLE-LEVEL PCA ANALYSIS ({mode_name})")
     pca_model, transformed_data, scaler, original_features, feature_names = perform_pca_on_battles(
         battleline=battleline_struct,
         n_components=min(10, len(battleline_struct.battles)),  # Can't have more components than samples
@@ -467,23 +467,19 @@ def main():
     )
     
     # Display the actual battle feature values
-    print("\n" + "=" * 80)
-    print("BATTLE FEATURE VALUES")
-    print("=" * 80)
+    logger.log_section_header("BATTLE FEATURE VALUES")
     for i, battle_id in enumerate(battleline_struct.battles.keys()):
-        print(f"\nBattle {battle_id} feature values (first 20 features):")
+        logger.log(0, 1, 0, logger.Colors.BRIGHT_CYAN, f"Battle {battle_id} feature values (first 20 features):")
         for j in range(min(20, len(feature_names))):
-            print(f"  {feature_names[j]}: {original_features[i, j]:.3f}")
-        print("  ...")
+            logger.log(1, 0, 0, logger.Colors.DIM, f"{feature_names[j]}: {original_features[i, j]:.3f}")
+        logger.log(1, 0, 0, logger.Colors.DIM, "...")
     
     # Show PCA-transformed coordinates for each battle
-    print("\n" + "=" * 80)
-    print("BATTLE COORDINATES IN PCA SPACE")
-    print("=" * 80)
+    logger.log_section_header("BATTLE COORDINATES IN PCA SPACE")
     for i, battle_id in enumerate(battleline_struct.battles.keys()):
-        print(f"\nBattle {battle_id} in PCA space:")
+        logger.log(0, 1, 0, logger.Colors.BRIGHT_CYAN, f"Battle {battle_id} in PCA space:")
         coords = ", ".join([f"PC{j+1}={transformed_data[i, j]:.3f}" for j in range(min(5, transformed_data.shape[1]))])
-        print(f"  [{coords}]")
+        logger.log(1, 0, 0, logger.Colors.INFO, f"[{coords}]")
     
     return {
         'battleline_struct': battleline_struct,

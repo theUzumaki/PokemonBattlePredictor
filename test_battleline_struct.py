@@ -226,22 +226,26 @@ adv_team4 = v.adv_team(
 # Create battles with more variety
 battle1 = v.battle(
     team1=team1,
-    team2=adv_team1
+    team2=adv_team1,
+    win=1  # Team1 won
 )
 
 battle2 = v.battle(
     team1=team1,
-    team2=adv_team2
+    team2=adv_team2,
+    win=0  # Team1 lost
 )
 
 battle3 = v.battle(
     team1=team2,  # Different team1
-    team2=adv_team3
+    team2=adv_team3,
+    win=1  # Team1 won
 )
 
 battle4 = v.battle(
     team1=team3,  # Another different team1
-    team2=adv_team4
+    team2=adv_team4,
+    win=0  # Team1 lost
 )
 
 # Create the battleline structure with more battles

@@ -1,10 +1,10 @@
 """
 Simplified training module for Pokemon Battle Predictor.
-Uses Linear Regression on PCA-transformed features.
+Uses Logistic Regression on PCA-transformed features.
 """
 
 import numpy as np
-from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 import pickle
@@ -25,9 +25,6 @@ N_COMPONENTS = 200
 # Global default threshold used to convert predicted probabilities to binary labels
 THRESHOLD = 0.5
 
-
-#ATTENZIONE!!!! DA CAMBIARE IN LOGISTIC REGRESSION??!!??!!?!?!
-
 def get_labels_from_battleline(battleline: v.battleline):
     """Extract win/loss labels from battleline."""
     labels = []
@@ -39,20 +36,21 @@ def get_labels_from_battleline(battleline: v.battleline):
 def train_model(
     battleline: v.battleline,
     n_components: int = 10,
-    use_ridge: bool = True,
-    alpha: float = 1.0,
+    C: float = 1.0,
+    max_iter: int = 1000,
     test_size: float = 0.2,
     threshold: float = 0.5,
 ):
     """
-    Train a linear regression model on PCA features.
+    Train a logistic regression model on PCA features.
     
     Args:
         battleline: The battleline struct with battle data
         n_components: Number of PCA components (default: 10)
-        use_ridge: Use Ridge regression instead of standard (default: True)
-        alpha: Regularization strength for Ridge (default: 1.0)
+        C: Inverse of regularization strength (default: 1.0)
+        max_iter: Maximum number of iterations for solver (default: 1000)
         test_size: Fraction of data for testing (default: 0.2)
+        threshold: Threshold for classification (default: 0.5)
         
     Returns:
         Dictionary with model, metrics, and fitted transformers
@@ -93,21 +91,17 @@ def train_model(
     
     # Step 4: Train model
     logger.log_step(4, 4, "Training model")
-    if use_ridge:
-        model = Ridge(alpha=alpha)
-        logger.log(1, 0, 1, logger.Colors.INFO, f"Model: Ridge Regression (alpha={alpha})")
-    else:
-        model = LinearRegression()
-        logger.log(1, 0, 1, logger.Colors.INFO, "Model: Linear Regression")
+    model = LogisticRegression(C=C, max_iter=max_iter, random_state=42)
+    logger.log(1, 0, 1, logger.Colors.INFO, f"Model: Logistic Regression (C={C}, max_iter={max_iter})")
     
     model.fit(X_train, y_train)
     
     # Evaluate
-    train_pred = (model.predict(X_train) >= threshold).astype(int)
+    train_pred = model.predict(X_train)
     train_acc = accuracy_score(y_train, train_pred)
 
     if X_test.shape[0] > 0:
-        test_pred = (model.predict(X_test) >= threshold).astype(int)
+        test_pred = model.predict(X_test)
         test_acc = accuracy_score(y_test, test_pred)
     else:
         test_acc = None
@@ -124,8 +118,8 @@ def train_model(
         'pca_model': pca_model,
         'scaler': scaler,
         'n_components': n_components,
-        'use_ridge': use_ridge,
-        'alpha': alpha,
+        'C': C,
+        'max_iter': max_iter,
         'test_size': test_size,
         'threshold': threshold,
         'train_accuracy': train_acc,
@@ -195,8 +189,8 @@ def save_model_run(result, models_root: str = 'models', prefix: str = 'model'):
     params = [
         ('model_file', str(model_file)),
         ('n_components', str(result.get('n_components', ''))),
-        ('use_ridge', str(result.get('use_ridge', ''))),
-        ('alpha', str(result.get('alpha', ''))),
+        ('C', str(result.get('C', ''))),
+        ('max_iter', str(result.get('max_iter', ''))),
         ('test_size', str(result.get('test_size', ''))),
         ('prediction_threshold', str(result.get('threshold', ''))),
         ('train_accuracy', str(result.get('train_accuracy', ''))),
@@ -238,15 +232,15 @@ def predict(battleline: v.battleline, model_package, threshold=0.5):
     features_scaled = model_package['scaler'].transform(features)
     features_pca = model_package['pca_model'].transform(features_scaled)
     
-    # Predict
-    predictions = model_package['model'].predict(features_pca)
-    binary_preds = (predictions >= threshold).astype(int)
+    # Predict probabilities using logistic regression
+    probabilities = model_package['model'].predict_proba(features_pca)[:, 1]
+    binary_preds = (probabilities >= threshold).astype(int)
     
     # Map to battle IDs
     results = {}
     for i, battle_id in enumerate(battleline.battles.keys()):
         results[battle_id] = {
-            'probability': predictions[i],
+            'probability': probabilities[i],
             'prediction': binary_preds[i]
         }
     
@@ -272,8 +266,8 @@ if __name__ == "__main__":
     result = train_model(
         battleline=battleline_struct,
         n_components=N_COMPONENTS,
-        use_ridge=True,
-        alpha=1.0,
+        C=1.0,
+        max_iter=1000,
         test_size=TEST_SIZE,
         threshold=THRESHOLD
     )

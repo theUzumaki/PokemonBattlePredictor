@@ -115,7 +115,7 @@ def main():
 	features_pca = pca.transform(features_scaled)
 
 	logger.log_info("Running predictions...")
-	probs = model.predict(features_pca)
+	probs = model.predict_proba(features_pca)[:, 1]
 	wins = (probs >= threshold)
 
 	# Map predictions to battle ids (the same ordering used by feature extractor)

@@ -50,7 +50,7 @@ def train_model(
         C: Inverse of regularization strength (default: 1.0)
         max_iter: Maximum number of iterations for solver (default: 1000)
         test_size: Fraction of data for testing (default: 0.2)
-        threshold: Threshold for classification (default: 0.5)
+        threshold: Threshold for converting probabilities to binary predictions (default: 0.5)
         
     Returns:
         Dictionary with model, metrics, and fitted transformers
@@ -96,12 +96,14 @@ def train_model(
     
     model.fit(X_train, y_train)
     
-    # Evaluate
-    train_pred = model.predict(X_train)
+    # Evaluate using custom threshold
+    train_proba = model.predict_proba(X_train)[:, 1]
+    train_pred = (train_proba >= threshold).astype(int)
     train_acc = accuracy_score(y_train, train_pred)
 
     if X_test.shape[0] > 0:
-        test_pred = model.predict(X_test)
+        test_proba = model.predict_proba(X_test)[:, 1]
+        test_pred = (test_proba >= threshold).astype(int)
         test_acc = accuracy_score(y_test, test_pred)
     else:
         test_acc = None
@@ -232,7 +234,7 @@ def predict(battleline: v.battleline, model_package, threshold=0.5):
     features_scaled = model_package['scaler'].transform(features)
     features_pca = model_package['pca_model'].transform(features_scaled)
     
-    # Predict probabilities using logistic regression
+    # Predict using predict_proba for logistic regression
     probabilities = model_package['model'].predict_proba(features_pca)[:, 1]
     binary_preds = (probabilities >= threshold).astype(int)
     

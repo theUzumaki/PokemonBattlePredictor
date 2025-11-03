@@ -149,6 +149,39 @@ def main():
 		for bid, win in zip(battle_ids, wins):
 			writer.writerow([bid, int(win)])
 
+	# Compare with previous prediction if it exists
+	diff_percentage = None
+	previous_pred_num = next_n - 1
+	if previous_pred_num >= 1:
+		prev_run_dir = pred_root / f"prediction_{previous_pred_num}"
+		prev_pred_file = prev_run_dir / "prediction.csv"
+		
+		if prev_pred_file.exists():
+			logger.log_info(f"Comparing with previous prediction: {prev_pred_file}")
+			
+			# Read previous predictions
+			prev_predictions = {}
+			with prev_pred_file.open("r", encoding="utf-8") as fh:
+				reader = csv.DictReader(fh)
+				for row in reader:
+					prev_predictions[str(row["battle_id"])] = int(row["player_won"])
+			
+			# Count differences
+			num_differences = 0
+			num_compared = 0
+			for bid, win in zip(battle_ids, wins):
+				bid_str = str(bid)
+				if bid_str in prev_predictions:
+					num_compared += 1
+					if int(win) != prev_predictions[bid_str]:
+						num_differences += 1
+			
+			if num_compared > 0:
+				diff_percentage = (num_differences / num_compared) * 100
+				logger.log_info(f"Difference from previous prediction: {num_differences}/{num_compared} battles ({diff_percentage:.2f}%)")
+			else:
+				logger.log_info("No overlapping battle IDs with previous prediction")
+
 	# Write params.txt with run parameters (human-readable)
 	params_file = run_dir / "params.txt"
 	params = [
@@ -158,6 +191,11 @@ def main():
 		("num_battles", str(len(battle_ids))),
 		("run_timestamp", utc_iso_now()),
 	]
+	
+	if diff_percentage is not None:
+		params.append(("diff_from_previous_pct", f"{diff_percentage:.2f}"))
+		params.append(("previous_prediction", str(previous_pred_num)))
+	
 	with params_file.open("w", encoding="utf-8") as fh:
 		for k, v in params:
 			fh.write(f"{k}: {v}\n")

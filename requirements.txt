@@ -1,5 +1,5 @@
 # Core dependencies for Pokemon Battle Predictor
-# Training module with Linear Regression on PCA features
+# Training modules: PCA + Logistic Regression, Random Forest, and Ensemble Learning
 
 # Scientific computing
 numpy>=1.24.0
@@ -7,11 +7,14 @@ numpy>=1.24.0
 # Machine learning
 scikit-learn>=1.3.0
 
+# Gradient Boosting (recommended for ensemble methods)
+xgboost>=2.0.0
+
 # External module from GitHub to handle logging
 git+https://github.com/theUzumaki/Chronicle.git
 
 # Optional: If you need data processing
-# pandas>=2.0.0
+pandas>=2.0.0
 
 # Optional: If you need visualization
 # matplotlib>=3.7.0

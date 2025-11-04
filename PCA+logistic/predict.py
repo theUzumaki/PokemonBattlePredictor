@@ -14,11 +14,18 @@ It reuses the repository's `battleline_extractor.create_final_turn_feature` and
 
 from __future__ import annotations
 
+import sys
 import csv
 import json
 import pickle
 from pathlib import Path
 from typing import Any
+
+# Add parent directory to path to import shared modules
+sys.path.append(str(Path(__file__).parent.parent))
+# Add current directory to path for local modules
+sys.path.insert(0, str(Path(__file__).parent))
+
 import chronicle.logger as logger
 from utilities.time_utils import utc_iso_now
 
@@ -53,9 +60,12 @@ def main():
 	  - threshold: 0.5
 	"""
 
-	# Config (hardcoded defaults)
-	model_path = Path("models/trained_model.pkl")
-	input_path = Path("data/test.jsonl")
+	# Get the repository root (parent of PCA+logistic directory)
+	repo_root = Path(__file__).parent.parent
+	
+	# Config (hardcoded defaults) - paths relative to repo root
+	model_path = repo_root / "models" / "trained_model.pkl"
+	input_path = repo_root / "data" / "test.jsonl"
 	threshold = 0.5
 
 	# Lazy imports that depend on the project
@@ -67,7 +77,7 @@ def main():
 
 	# If a fixed model path doesn't exist, try to locate the latest run under models/*
 	if not model_path.exists():
-		models_root = Path("models")
+		models_root = repo_root / "PCA+logistic" / "models"
 		if models_root.exists():
 			candidates = [p for p in models_root.iterdir() if p.is_dir() and p.name.startswith("model_")]
 			nums = []
@@ -125,7 +135,7 @@ def main():
 
 	# Write CSV
 	# Prepare predictions directory and sequential run folder
-	pred_root = Path("predictions")
+	pred_root = repo_root / "PCA+logistic" / "predictions"
 	pred_root.mkdir(parents=True, exist_ok=True)
 
 	# Find next sequential run number

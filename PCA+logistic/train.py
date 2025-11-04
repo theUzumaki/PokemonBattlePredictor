@@ -3,6 +3,14 @@ Simplified training module for Pokemon Battle Predictor.
 Uses Logistic Regression on PCA-transformed features.
 """
 
+import sys
+from pathlib import Path
+
+# Add parent directory to path for shared modules
+sys.path.append(str(Path(__file__).parent.parent))
+# Add current directory to path for local modules
+sys.path.insert(0, str(Path(__file__).parent))
+
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -13,7 +21,6 @@ import json
 import variables as v
 import battleline_extractor as be
 from load_into_pca import perform_pca_on_battles
-from battleline_extractor import create_final_turn_feature
 import chronicle.logger as logger
 from utilities.time_utils import utc_iso_now
 
@@ -159,7 +166,9 @@ def save_model_run(result, models_root: str = 'models', prefix: str = 'model'):
     """
     from pathlib import Path
 
-    root = Path(models_root)
+    # Get repository root (parent of PCA+logistic)
+    repo_root = Path(__file__).parent.parent
+    root = repo_root / "PCA+logistic" / models_root
     root.mkdir(parents=True, exist_ok=True)
 
     existing = [p.name for p in root.iterdir() if p.is_dir() and p.name.startswith(f"{prefix}_")]
@@ -253,8 +262,13 @@ if __name__ == "__main__":
     
     logger.log_info("Training on example data...", newline_before=1)
 
+    # Get repository root (parent of PCA+logistic)
+    from pathlib import Path
+    repo_root = Path(__file__).parent.parent
+    data_path = repo_root / "data" / "train.jsonl"
+
     train_data = []
-    with open("data/train.jsonl", 'r') as f:
+    with open(data_path, 'r') as f:
         for line in f:
             # json.loads() parses one line (one JSON object) into a Python dictionary
             line = line.strip()

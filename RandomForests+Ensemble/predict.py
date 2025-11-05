@@ -28,34 +28,31 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # Try importing logger
 try:
-    import utilities.logger as logger
+    import chronicle.logger as logger
 except ImportError:
-    try:
-        import chronicle.logger as logger
-    except ImportError:
-        # Fallback simple logger
-        class SimpleLogger:
-            @staticmethod
-            def log_info(message, newline_before=0):
-                print("\n" * newline_before + f"ℹ {message}")
-            
-            @staticmethod
-            def log_success(message, newline_before=0, newline_after=0):
-                print("\n" * newline_before + f"✓ {message}" + "\n" * newline_after)
-            
-            @staticmethod
-            def log_application_title(title):
-                print(f"\n{'='*60}\n{title.center(60)}\n{'='*60}\n")
-            
-            @staticmethod
-            def log_step(step, total, description):
-                print(f"\n[Step {step}/{total}] {description}")
-            
-            class Colors:
-                INFO = ""
-                BRIGHT_GREEN = ""
+    # Fallback simple logger
+    class SimpleLogger:
+        @staticmethod
+        def log_info(message, newline_before=0):
+            print("\n" * newline_before + f"ℹ {message}")
         
-        logger = SimpleLogger()
+        @staticmethod
+        def log_success(message, newline_before=0, newline_after=0):
+            print("\n" * newline_before + f"✓ {message}" + "\n" * newline_after)
+        
+        @staticmethod
+        def log_application_title(title):
+            print(f"\n{'='*60}\n{title.center(60)}\n{'='*60}\n")
+        
+        @staticmethod
+        def log_step(step, total, description):
+            print(f"\n[Step {step}/{total}] {description}")
+        
+        class Colors:
+            INFO = ""
+            BRIGHT_GREEN = ""
+    
+    logger = SimpleLogger()
 
 from utilities.time_utils import utc_iso_now
 
@@ -86,7 +83,7 @@ def main():
     Defaults:
       - model: latest model from models/ directory
       - input: ../data/test.jsonl
-      - threshold: 0.5
+      - threshold: 0.45
     """
 
     # Get the current directory (RandomForests+Ensemble)
@@ -95,7 +92,7 @@ def main():
     
     # Config - paths relative to repo root
     input_path = repo_root / "data" / "test.jsonl"
-    threshold = 0.5
+    threshold = 0.45
 
     # Lazy imports that depend on the project
     try:
@@ -207,11 +204,11 @@ def main():
     
     with output_path.open("w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["id", "player_won"])
+        writer.writerow(["battle_id", "player_won"])
         
-        for i, (battle_id, pred) in enumerate(zip(test_battleline.battles.keys(), predictions)):
-            writer.writerow([i, pred])
-    
+        for battle_id, pred in zip(test_battleline.battles.keys(), predictions):
+            writer.writerow([battle_id, pred])
+
     logger.log_success(f"Predictions saved to: {output_path}", newline_before=1)
     
     # Save params file

@@ -18,6 +18,7 @@ Options:
     --ensemble    Use Ensemble model (Random Forest + XGBoost + Gradient Boosting)
     --train       Run only training (disable prediction)
     --predict     Run only prediction (disable training)
+    --rm          Remove previous model and prediction files before running
     -h, --help    Show this help
 EOF
 }
@@ -45,6 +46,11 @@ while [[ $# -gt 0 ]]; do
         --predict)
             RUN_TRAIN=0
             RUN_PREDICT=1
+            shift
+            ;;
+        --rm)
+            rm -rf "$DIR/models/"*
+            rm -rf "$DIR/predictions/"*
             shift
             ;;
         -h|--help)

@@ -23,14 +23,15 @@ import battleline_extractor as be
 from load_into_pca import perform_pca_on_battles
 import chronicle.logger as logger
 from utilities.time_utils import utc_iso_now
+from utilities.plot_utils import plot_training_summary
 
 # Global config: default test set size for train/test split.
 # Set to 0.0 to use the full dataset for training (no test split).
-TEST_SIZE = 0.0
+TEST_SIZE = 0
 # Global default number of PCA components to use during training
 N_COMPONENTS = 200
 # Global default threshold used to convert predicted probabilities to binary labels
-THRESHOLD = 0.5
+THRESHOLD = 0.485
 
 def get_labels_from_battleline(battleline: v.battleline):
     """Extract win/loss labels from battleline."""
@@ -216,6 +217,8 @@ def save_model_run(result, models_root: str = 'models', prefix: str = 'model'):
             fh.write(f"{k}: {v}\n")
 
     logger.log_success(f"Model run saved to: {run_dir}", newline_before=1, newline_after=1)
+    
+    return run_dir
 
 
 def load_model(filepath='models/trained_model.pkl'):
@@ -289,6 +292,20 @@ if __name__ == "__main__":
     )
     
     # Save model into a sequential run folder under models/
-    save_model_run(result, models_root='models', prefix='model')
+    run_dir = save_model_run(result, models_root='models', prefix='model')
+    
+    # Generate and save training plots
+    logger.log_info("Generating training visualizations...", newline_before=1)
+    plots_dir = run_dir / 'plots'
+    try:
+        plot_training_summary(
+            result=result,
+            save_dir=plots_dir,
+            model_name="PCA + Logistic Regression"
+        )
+        logger.log_success(f"Plots saved to: {plots_dir}", newline_before=0, newline_after=1)
+    except Exception as e:
+        logger.log(0, 0, 0, logger.Colors.YELLOW, f"Warning: Could not generate plots: {e}")
+        logger.log(0, 0, 1, logger.Colors.YELLOW, "Install matplotlib and seaborn: pip install matplotlib seaborn")
 
     logger.log_final_result(True, "Training complete!")

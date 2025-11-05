@@ -18,10 +18,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import SelectFromModel
 import pickle
 import json
+import chronicle.logger as logger
 
 import variables as v
 import battleline_extractor as be
 from utilities.time_utils import utc_iso_now
+from utilities.plot_utils import plot_training_summary
 
 # Import feature extraction from PCA module (reusing the same features)
 sys.path.append(str(Path(__file__).parent.parent / "PCA+logistic"))
@@ -36,56 +38,10 @@ except ImportError:
     XGBOOST_AVAILABLE = False
     print("Warning: XGBoost not available. Install with: pip install xgboost")
 
-# Try importing logger
-try:
-    import Chronicle.logger as logger
-except ImportError:
-    try:
-        import chronicle.logger as logger
-    except ImportError:
-        # Fallback simple logger
-        class SimpleLogger:
-            @staticmethod
-            def log_application_title(title):
-                print(f"\n{'='*60}\n{title.center(60)}\n{'='*60}\n")
-            
-            @staticmethod
-            def log_step(step, total, description):
-                print(f"\n[Step {step}/{total}] {description}")
-            
-            @staticmethod
-            def log(indent1, indent2, indent3, color, message):
-                print("  " * (indent1 + indent2 + indent3) + message)
-            
-            @staticmethod
-            def log_section_header(title):
-                print(f"\n{'-'*60}\n{title}\n{'-'*60}")
-            
-            @staticmethod
-            def log_success(message, newline_before=0, newline_after=0):
-                print("\n" * newline_before + f"✓ {message}" + "\n" * newline_after)
-            
-            @staticmethod
-            def log_info(message, newline_before=0):
-                print("\n" * newline_before + f"ℹ {message}")
-            
-            @staticmethod
-            def log_final_result(success, message):
-                print(f"\n{'='*60}\n{'✓' if success else '✗'} {message}\n{'='*60}\n")
-            
-            class Colors:
-                INFO = ""
-                BRIGHT_GREEN = ""
-                BOLD = ""
-                DIM = ""
-                YELLOW = ""
-        
-        logger = SimpleLogger()
-
 
 # Global config
 TEST_SIZE = 0.15  # Validation split (reduced from 0.2 to have more training data - Improvement #3)
-THRESHOLD = 0.5  # Classification threshold
+THRESHOLD = 0.45  # Classification threshold
 USE_FEATURE_SELECTION = True  # Enable feature selection based on importance (Improvement #2)
 TOP_FEATURES = 300  # Number of top features to keep (reduced from 984 - Improvement #2)
 
@@ -421,6 +377,20 @@ if __name__ == "__main__":
         use_feature_selection=USE_FEATURE_SELECTION,
         n_top_features=TOP_FEATURES
     )
-    save_model_run(ensemble_result, models_root='models', prefix='model')
+    run_dir = save_model_run(ensemble_result, models_root='models', prefix='model')
+    
+    # Generate and save training plots
+    logger.log_info("Generating training visualizations...", newline_before=1)
+    plots_dir = run_dir / 'plots'
+    try:
+        plot_training_summary(
+            result=ensemble_result,
+            save_dir=plots_dir,
+            model_name="Random Forest Ensemble"
+        )
+        logger.log_success(f"Plots saved to: {plots_dir}", newline_before=0, newline_after=1)
+    except Exception as e:
+        logger.log(0, 0, 0, logger.Colors.YELLOW, f"Warning: Could not generate plots: {e}")
+        logger.log(0, 0, 1, logger.Colors.YELLOW, "Install matplotlib and seaborn: pip install matplotlib and seaborn")
 
     logger.log_final_result(True, "Ensemble training complete!")

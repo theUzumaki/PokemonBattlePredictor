@@ -66,7 +66,7 @@ def main():
 	# Config (hardcoded defaults) - paths relative to repo root
 	model_path = repo_root / "models" / "trained_model.pkl"
 	input_path = repo_root / "data" / "test.jsonl"
-	threshold = 0.5
+	threshold = 0.485
 
 	# Lazy imports that depend on the project
 	try:
